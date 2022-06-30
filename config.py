@@ -1,10 +1,10 @@
 from os import environ
 
 TOKEN = environ["TOKEN"]
-DATABASE = environ["DATABASE"]
-
 API_ID = environ["API_ID"]
 API_HASH = environ["API_HASH"]
+
+DATABASE = environ["DATABASE_URL"]
 
 GREETING_MESSAGE = '''
 Привет 👋 Я — бот Поздравитель!
