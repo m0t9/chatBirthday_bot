@@ -15,7 +15,7 @@ class DatabaseWorker:
         self.cursor = self.database.cursor()
         initial_commands = [
             '''CREATE TABLE users (
-                id INTEGER PRIMARY UNIQUE KEY,
+                id INTEGER PRIMARY KEY,
                 b_day INTEGER NOT NULL,
                 b_month INTEGER NOT NULL
             )''',
