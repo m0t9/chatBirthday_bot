@@ -15,12 +15,12 @@ class DatabaseWorker:
         self.database = psycopg2.connect(database_name, sslmode='require')
         self.cursor = self.database.cursor()
         initial_commands = [
-            '''CREATE TABLE users (
+            '''CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 b_day INTEGER NOT NULL,
                 b_month INTEGER NOT NULL
             )''',
-            '''CREATE TABLE chats (
+            '''CREATE TABLE IF NOT EXISTS chats (
                 id INTEGER PRIMARY KEY,
                 notification_hour INTEGER NOT NULL,
                 notification_minute INTEGER NOT NULL
@@ -29,10 +29,7 @@ class DatabaseWorker:
         ]
 
         for command in initial_commands:
-            try:
-                self.cursor.execute(command)
-            except DuplicateTable:  # already created
-                pass
+            self.cursor.execute(command)
 
         self.database.commit()
 
