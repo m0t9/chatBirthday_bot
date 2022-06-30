@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2.errors import DuplicateTable
 
 
 class DatabaseWorkerError(BaseException):
@@ -28,7 +29,11 @@ class DatabaseWorker:
         ]
 
         for command in initial_commands:
-            self.cursor.execute(command)
+            try:
+                self.cursor.execute(command)
+            except DuplicateTable:  # already created
+                pass
+
         self.database.commit()
 
     # user methods
