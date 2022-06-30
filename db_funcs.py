@@ -35,7 +35,8 @@ class DatabaseWorker:
 
     # user methods
     def birth_date_exists(self, user_id):
-        day = self.cursor.execute('SELECT b_day FROM users WHERE id = %s', (user_id,)).fetchone()
+        self.cursor.execute('SELECT b_day FROM users WHERE id = %s', (user_id,))
+        day = self.cursor.fetchone()
         if day is None:
             return False
         return True
@@ -44,8 +45,10 @@ class DatabaseWorker:
         if not self.birth_date_exists(user_id):
             raise BirthDateNotExists
 
-        day = self.cursor.execute('SELECT b_day FROM users WHERE id = %s', (user_id,)).fetchone()
-        month = self.cursor.execute('SELECT b_month FROM users WHERE id = %s', (user_id,)).fetchone()
+        self.cursor.execute('SELECT b_day FROM users WHERE id = %s', (user_id,))
+        day = self.cursor.fetchone()
+        self.cursor.execute('SELECT b_month FROM users WHERE id = %s', (user_id,))
+        month = self.cursor.fetchone()
         return day[0], month[0]
 
     def set_birth_date(self, user_id, birth_day, birth_month):
@@ -67,8 +70,9 @@ class DatabaseWorker:
             self.database.commit()
 
     def get_users_to_notify(self, day, month):
-        respond = self.cursor.execute('SELECT id FROM users WHERE (b_day = %s AND b_month = %s)',
-                                      (day, month,)).fetchall()
+        self.cursor.execute('SELECT id FROM users WHERE (b_day = %s AND b_month = %s)',
+                            (day, month,))
+        respond = self.cursor.fetchall()
         users_to_notify = set()
         for pair in respond:
             users_to_notify.add(pair[0])
@@ -76,7 +80,8 @@ class DatabaseWorker:
 
     # chat methods
     def notification_time_exists(self, chat_id):
-        hour = self.cursor.execute('SELECT notification_hour FROM chats WHERE id = %s', (chat_id,)).fetchone()
+        self.cursor.execute('SELECT notification_hour FROM chats WHERE id = %s', (chat_id,))
+        hour = self.cursor.fetchone()
         if hour is None:
             return False
         return True
@@ -100,9 +105,10 @@ class DatabaseWorker:
             self.database.commit()
 
     def get_chats_to_notify(self, notification_hour, notification_minute):
-        respond = self.cursor.execute(
+        self.cursor.execute(
             'SELECT id FROM chats WHERE (notification_hour = %s AND notification_minute = %s)',
-            (notification_hour, notification_minute,)).fetchall()
+            (notification_hour, notification_minute,))
+        respond = self.cursor.fetchall()
         chats_to_notify = list()
         for pair in respond:
             chats_to_notify.append(pair[0])
