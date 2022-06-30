@@ -20,7 +20,7 @@ class DatabaseWorker:
                 b_month INTEGER NOT NULL
             )''',
             '''CREATE TABLE chats (
-                id INTEGER PRIMARY UNIQUE KEY,
+                id INTEGER PRIMARY KEY,
                 notification_hour INTEGER NOT NULL,
                 notification_minute INTEGER NOT NULL
             )
