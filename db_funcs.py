@@ -16,12 +16,12 @@ class DatabaseWorker:
         self.cursor = self.database.cursor()
         initial_commands = [
             '''CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
+                id BIGINT PRIMARY KEY,
                 b_day INTEGER NOT NULL,
                 b_month INTEGER NOT NULL
             )''',
             '''CREATE TABLE IF NOT EXISTS chats (
-                id INTEGER PRIMARY KEY,
+                id BIGINT PRIMARY KEY,
                 notification_hour INTEGER NOT NULL,
                 notification_minute INTEGER NOT NULL
             )
