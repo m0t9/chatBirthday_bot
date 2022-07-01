@@ -1,5 +1,4 @@
 import psycopg2
-from psycopg2.errors import DuplicateTable
 
 
 class DatabaseWorkerError(BaseException):

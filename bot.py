@@ -2,6 +2,7 @@ from telethon.sync import TelegramClient, events
 from telethon import functions
 from telethon.tl.types import ChannelParticipantsSearch
 import datetime
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
 import db_funcs
@@ -27,7 +28,6 @@ bot = TelegramClient('bot', config.API_ID, config.API_HASH).start(bot_token=conf
 bot.parse_mode = 'html'
 
 moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
-previous_check = datetime.datetime.now(tz=moscow_timezone).minute - 1
 
 
 # useful utils
@@ -59,15 +59,6 @@ def is_date_correct(day, month):
 
 def is_time_correct(hours, minutes):
     return (0 <= hours < 24) and (0 <= minutes < 60)
-
-
-def is_notice_pending():
-    global previous_check
-    if datetime.datetime.now(tz=moscow_timezone).minute == previous_check:
-        return False
-
-    previous_check = datetime.datetime.now(tz=moscow_timezone).minute
-    return True
 
 
 async def is_user_admin(user_id, chat_id):
@@ -141,9 +132,6 @@ async def disable_notifications(event):
 
 # bot notification sending
 async def send_notification():
-    if not is_notice_pending():
-        return
-
     hour, minute = int(datetime.datetime.now(tz=moscow_timezone).hour), int(
         datetime.datetime.now(tz=moscow_timezone).minute)
     day, month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
@@ -167,6 +155,10 @@ async def send_notification():
         await congratulation(users_to_notify_in_chat, day, month, chat_id)
 
 
-# run bot loop
-while True:
-    bot.loop.run_until_complete(send_notification())
+# start bot
+if __name__ == "__main__":
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(send_notification, 'interval', minutes=1)
+    scheduler.start()
+
+    bot.loop.run_forever()
