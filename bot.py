@@ -33,7 +33,10 @@ previous_check = datetime.datetime.now(tz=moscow_timezone).minute - 1
 # useful utils
 async def create_mention(user_id):
     user = (await bot(functions.users.GetFullUserRequest(user_id))).user
-    return f'<a href="tg://user?id={user_id}">{user.first_name} {user.last_name}</a>'
+    initials = [user.first_name]
+    if user.last_name is not None:
+        initials.append(user.last_name)
+    return f'<a href="tg://user?id={user_id}">{" ".join(initials)}</a>'
 
 
 async def congratulation(mentions, day, month, chat_id):
@@ -45,7 +48,7 @@ async def congratulation(mentions, day, month, chat_id):
         word_forms[1] = 'его'
 
     text = f'В этот замечательный день — {day} {month_properties[month][1]} ' \
-           f'День рождения {word_forms[0]} {", ".join(mentions)}!\n\nДавайте вместе {word_forms[1]} поздравим 🎉🎉🎉'
+           f'свой День рождения {word_forms[0]} {", ".join(mentions)}!\n\nДавайте вместе {word_forms[1]} поздравим 🎉🎉🎉'
 
     await bot.send_message(chat_id, text)
 
@@ -86,8 +89,9 @@ async def greeting(event):
 @bot.on(events.NewMessage(pattern='^/remove_bd(|@chatBirthday_bot)$'))
 async def remove_birth_date(event):
     user_id = (await event.get_sender()).id
-    db_worker.remove_birth_date(user_id)
-    await event.reply('Ваша дата рождения успешно удалена ❌')
+    if db_worker.birth_date_exists(user_id):
+        db_worker.remove_birth_date(user_id)
+        await event.reply('Дата Вашего рождения успешно удалена ❌')
 
 
 @bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot) [0-9][0-9].[0-9][0-9]$'))
@@ -100,7 +104,7 @@ async def edit_birth_date(event):
         return
 
     db_worker.update_birth_date(sender_id, birth_day, birth_month)
-    await event.reply(f'Отлично!\nДата Вашего Дня'
+    await event.reply(f'Отлично!\nДата Вашего'
                       f' рождения успешно установлена на {birth_day} {month_properties[birth_month][1]} 🎉')
 
 
@@ -133,17 +137,6 @@ async def disable_notifications(event):
 
     db_worker.disable_notification(chat_id)
     await event.reply(f'Уведомления о наступивших Днях рождения в этом чате отключены ❌')
-
-
-'''
-@bot.on(events.NewMessage(pattern='/check'))
-async def get_time(event):
-    hour, minute = int(datetime.datetime.now(tz=moscow_timezone).hour), int(
-        datetime.datetime.now(tz=moscow_timezone).minute)
-    day, month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
-        datetime.datetime.now(tz=moscow_timezone).month)
-    await event.reply(f'{day}.{month} {hour}:{minute}')
-'''
 
 
 # bot notification sending
