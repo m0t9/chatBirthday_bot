@@ -79,7 +79,7 @@ def create_list(calendar):
     message_blocks = ['<b>Данные о Днях рождения в этом чате</b>']
 
     for date, users in days_info:
-        day_message = [f'<b>{date[1]} {month_properties[date[0]]}</b>', ', '.join(users)]
+        day_message = [f'<b>{date[1]} {month_properties[date[0]][1]}</b>', ', '.join(users)]
         message_blocks.append('\n'.join(day_message))
 
     return '\n\n'.join(message_blocks)
