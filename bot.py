@@ -167,7 +167,9 @@ async def show_all_birthdays_in_chat(event):
             calendar[(birth_month, birth_day)].append(mention)
         else:
             calendar[(birth_month, birth_day)] = [mention]
-    await event.reply(create_list(calendar))
+
+    message = await event.reply('.')
+    await bot.edit_message(chat_id, message, create_list(calendar))
 
 
 # bot notification sending
