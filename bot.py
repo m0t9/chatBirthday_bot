@@ -144,7 +144,7 @@ async def disable_notifications(event):
     await event.reply(f'Уведомления о наступивших Днях рождения в этом чате отключены ❌')
 
 
-@bot.on(events.NewMessage(pattern='^/bd_list(|@chatBirthday_bot)$'))
+@bot.on(events.NewMessage(pattern='^/(bd_list|list_bd)(|@chatBirthday_bot)$'))
 async def show_all_birthdays_in_chat(event):
     chat_id = event.chat.id
     sender_id = (await event.get_sender()).id
