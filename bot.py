@@ -149,7 +149,7 @@ async def show_all_birthdays_in_chat(event):
     chat_id = event.chat.id
     sender_id = (await event.get_sender()).id
 
-    if not is_user_admin(sender_id, chat_id):
+    if not (await is_user_admin(sender_id, chat_id)):
         return
 
     chat_members = await bot(functions.channels.GetParticipantsRequest(
