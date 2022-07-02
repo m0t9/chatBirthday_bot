@@ -71,6 +71,20 @@ async def is_user_admin(user_id, chat_id):
         return False
 
 
+def create_list(calendar):
+    if len(calendar) == 0:
+        return 'В этом чате нет данных о Днях рождения 😔'
+
+    days_info = sorted(calendar.items())
+    message_blocks = ['<b>Данные о Днях рождения в этом чате</b>']
+
+    for date, users in days_info:
+        day_message = [f'<b>{date[1]} {month_properties[date[0]]}</b>', ', '.join(users)]
+        message_blocks.append('\n'.join(day_message))
+
+    return '\n\n'.join(message_blocks)
+
+
 # bot event behavior
 @bot.on(events.NewMessage(pattern='^(/start|/help)(|@chatBirthday_bot)$'))
 async def greeting(event):
@@ -128,6 +142,31 @@ async def disable_notifications(event):
 
     db_worker.disable_notification(chat_id)
     await event.reply(f'Уведомления о наступивших Днях рождения в этом чате отключены ❌')
+
+
+@bot.on(events.NewMessage(pattern='^/bd_list(|@chatBirthday_bot)$'))
+async def show_all_birthdays_in_chat(event):
+    chat_id = event.chat.id
+    sender_id = (await event.get_sender()).id
+
+    if not is_user_admin(sender_id, chat_id):
+        return
+
+    chat_members = await bot(functions.channels.GetParticipantsRequest(
+        chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
+        hash=0
+    ))
+
+    calendar = dict()
+    for member in chat_members:
+        if not db_worker.birth_date_exists(member.id):
+            continue
+        birth_day, birth_month = db_worker.get_birth_date(member.id)
+        if [birth_month, birth_day] in calendar:
+            calendar[[birth_month, birth_day]].append(create_mention(member.id))
+        else:
+            calendar[[birth_month, birth_day]] = [create_mention(member.id)]
+    await event.reply(create_list(calendar))
 
 
 # bot notification sending
