@@ -78,6 +78,15 @@ def create_list(calendar):
     days_info = sorted(calendar.items())
     message_blocks = ['<b>Данные о Днях рождения в этом чате</b>']
 
+    current_day, current_month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
+        datetime.datetime.now(tz=moscow_timezone).month)
+    for point in range(len(days_info)):
+        if days_info[point][0] >= (current_month, current_day):
+            for i in range(point):
+                days_info.append(days_info[0])
+                days_info.pop(0)
+            break
+
     for date, users in days_info:
         day_message = [f'<b>{date[1]} {month_properties[date[0]][1]}</b>', ', '.join(users)]
         message_blocks.append('\n'.join(day_message))
