@@ -162,10 +162,11 @@ async def show_all_birthdays_in_chat(event):
         if not db_worker.birth_date_exists(member.id):
             continue
         birth_day, birth_month = db_worker.get_birth_date(member.id)
+        mention = await create_mention(member.id)
         if (birth_month, birth_day) in calendar:
-            calendar[(birth_month, birth_day)].append(create_mention(member.id))
+            calendar[(birth_month, birth_day)].append(mention)
         else:
-            calendar[(birth_month, birth_day)] = [create_mention(member.id)]
+            calendar[(birth_month, birth_day)] = [mention]
     await event.reply(create_list(calendar))
 
 
