@@ -158,7 +158,7 @@ async def show_all_birthdays_in_chat(event):
     ))
 
     calendar = dict()
-    for member in chat_members:
+    for member in chat_members.users:
         if not db_worker.birth_date_exists(member.id):
             continue
         birth_day, birth_month = db_worker.get_birth_date(member.id)
