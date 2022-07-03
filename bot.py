@@ -31,6 +31,7 @@ moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
 
 
 # useful utils
+# text
 async def create_mention(user_id):
     user = (await bot(functions.users.GetFullUserRequest(user_id))).user
     initials = [user.first_name]
@@ -51,24 +52,6 @@ async def congratulation(mentions, day, month, chat_id):
            f'свой День рождения {word_forms[0]} {", ".join(mentions)}!\n\nДавайте вместе {word_forms[1]} поздравим 🎉🎉🎉'
 
     await bot.send_message(chat_id, text)
-
-
-def is_date_correct(day, month):
-    return (month in month_properties) and (1 <= day <= month_properties[month][0])
-
-
-def is_time_correct(hours, minutes):
-    return (0 <= hours < 24) and (0 <= minutes < 60)
-
-
-async def is_user_admin(user_id, chat_id):
-    try:
-        user = (await bot.get_permissions(chat_id, user_id))
-        is_user_chat_creator = user.is_creator
-        is_user_chat_admin = user.is_admin
-        return is_user_chat_admin or is_user_chat_creator
-    except ValueError:
-        return False
 
 
 def create_list(calendar):
@@ -94,6 +77,29 @@ def create_list(calendar):
     return '\n\n'.join(message_blocks)
 
 
+# recognize
+def is_date_correct(day, month):
+    return (month in month_properties) and (1 <= day <= month_properties[month][0])
+
+
+def is_time_correct(hours, minutes):
+    return (0 <= hours < 24) and (0 <= minutes < 60)
+
+
+async def is_user_admin(user_id, chat_id):
+    try:
+        user = (await bot.get_permissions(chat_id, user_id))
+        is_user_chat_creator = user.is_creator
+        is_user_chat_admin = user.is_admin
+        return is_user_chat_admin or is_user_chat_creator
+    except ValueError:
+        return False
+
+
+def get_args(text):
+    return (text.split())[1:]
+
+
 # bot event behavior
 @bot.on(events.NewMessage(pattern='^(/start|/help)(|@chatBirthday_bot)$'))
 async def greeting(event):
@@ -108,37 +114,62 @@ async def remove_birth_date(event):
         await event.reply('Дата Вашего рождения успешно удалена ❌')
 
 
-@bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot) [0-9][0-9].[0-9][0-9]$'))
+@bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot)'))
 async def edit_birth_date(event):
-    birth_day, birth_month = map(int, (event.message.text.split())[-1].split('.'))
-    sender_id = (await event.get_sender()).id
-
-    if not is_date_correct(birth_day, birth_month):
-        await event.reply('К сожалению, введённая дата некорректна 😔')
+    args = get_args(event.text)
+    if len(args) == 0:
+        await event.reply(
+            'Для выполнения этой команды необходимо задать дату рождения в формате \'dd.mm\' без кавычек.')
+        return
+    elif len(args) > 1:
+        await event.reply(
+            'Для выполнения этой команды нужен единственный параметр — дата рождения в формате \'dd.mm\' без кавычек.')
         return
 
-    db_worker.update_birth_date(sender_id, birth_day, birth_month)
-    await event.reply(f'Отлично!\nДата Вашего'
-                      f' рождения успешно установлена на {birth_day} {month_properties[birth_month][1]} 🎉')
+    try:
+        birth_day, birth_month = map(int, args[0].split('.'))
+        sender_id = (await event.get_sender()).id
+
+        if not is_date_correct(birth_day, birth_month):
+            await event.reply('К сожалению, введённая дата некорректна 😔')
+            return
+
+        db_worker.update_birth_date(sender_id, birth_day, birth_month)
+        await event.reply(f'Отлично!\nДата Вашего'
+                          f' рождения успешно установлена на {birth_day} {month_properties[birth_month][1]} 🎉')
+    except ValueError:
+        await event.reply('Это не похоже на дату рождения 🤨')
 
 
-@bot.on(events.NewMessage(pattern='^/notify_at(|@chatBirthday_bot) [0-9][0-9]:[0-9][0-9]$'))
+@bot.on(events.NewMessage(pattern='^/notify_at(|@chatBirthday_bot)'))
 async def update_notification_time(event):
     sender_id = (await event.get_sender()).id
     chat_id = event.chat.id
-    hours, minutes = map(int, (event.message.text.split())[-1].split(':'))
-
     if not (await is_user_admin(sender_id, chat_id)):
         return
 
-    if not is_time_correct(hours, minutes):
-        await event.reply('К сожалению, введённое время суток некорректно 😔')
+    args = get_args(event.text)
+    if len(args) == 0:
+        await event.reply(
+            'Для выполнения этой команды необходимо задать время в формате \'hh:mm\' без кавычек.')
         return
+    elif len(args) > 1:
+        await event.reply(
+            'Для выполнения этой команды нужен единственный параметр — время в формате \'hh:mm\' без кавычек.')
+        return
+    try:
+        hours, minutes = map(int, args[0].split(':'))
 
-    db_worker.update_notification_time(chat_id, hours, minutes)
-    await event.reply(
-        f'Отлично!\nВремя уведомления о наступивших Днях рождения в этом чате'
-        f' установлено на {("0" + str(hours))[-2:]}:{("0" + str(minutes))[-2:]} UTC+3 ⏰')
+        if not is_time_correct(hours, minutes):
+            await event.reply('К сожалению, введённое время суток некорректно 😔')
+            return
+
+        db_worker.update_notification_time(chat_id, hours, minutes)
+        await event.reply(
+            f'Отлично!\nВремя уведомления о наступивших Днях рождения в этом чате'
+            f' установлено на {("0" + str(hours))[-2:]}:{("0" + str(minutes))[-2:]} UTC+3 ⏰')
+    except ValueError:
+        await event.reply('Интересный формат времени 🧐 Жаль, что я его не понимаю 😔')
 
 
 @bot.on(events.NewMessage(pattern='^/dont_notify(|@chatBirthday_bot)$'))
