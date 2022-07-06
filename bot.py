@@ -156,7 +156,7 @@ async def edit_birth_date(event):
 
         db_worker.update_birth_date(sender_id, birth_day, birth_month)
         await event.reply(f'Отлично!\nДата Вашего'
-                          f' рождения успешно установлена на {birth_day} {month_properties[birth_month][1]} 🎉')
+                          f' рождения успешно установлена на {birth_day} {month_properties[birth_month].genitive} 🎉')
     except ValueError:
         await event.reply('Это не похоже на дату рождения 🤨')
 
