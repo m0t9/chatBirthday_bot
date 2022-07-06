@@ -123,20 +123,42 @@ async def remove_birth_date(event):
         await event.reply('Дата Вашего рождения успешно удалена ❌')
 
 
-@bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot)$'))
+@bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot)'))
 async def edit_birth_date(event):
-    sender_id = (await event.get_sender()).id
-    keyboard = list()
-    for row_ind in range(0, 12, 4):
-        keyboard_row = list()
-        for col in range(row_ind, row_ind + 4):
-            keyboard_row.append(Button.inline(month_properties[col + 1].name.capitalize(),
-                                              data=f"{sender_id} birthdate set_month {col + 1} -"))
-        keyboard.append(keyboard_row)
-    keyboard.append([Button.inline('Отмена ❌', data=f"{sender_id} birthdate set_month cancel -")])
+    args = get_args(event.text)
+    if len(args) == 0:
+        sender_id = (await event.get_sender()).id
+        keyboard = list()
+        for row_ind in range(0, 12, 4):
+            keyboard_row = list()
+            for col in range(row_ind, row_ind + 4):
+                keyboard_row.append(Button.inline(month_properties[col + 1].name.capitalize(),
+                                                  data=f"{sender_id} birthdate set_month {col + 1} -"))
+            keyboard.append(keyboard_row)
+        keyboard.append([Button.inline('Отмена ❌', data=f"{sender_id} birthdate set_month cancel -")])
 
-    await event.reply('<b>Установка (изменение) даты рождения</b>\nВыберите месяц, в который Вы родились',
-                      buttons=keyboard)
+        await event.reply('<b>Установка (изменение) даты рождения</b>\nВыберите месяц, в который Вы родились',
+                          buttons=keyboard)
+        return
+    elif len(args) > 1:
+        await event.reply(
+            'Для выполнения этой команды нужен единственный параметр — дата рождения в формате \'dd.mm\' без кавычек. '
+            'Также доступно интерактивное изменение даты рождения, для этого не нужно вводить дополнительные параметры.')
+        return
+
+    try:
+        birth_day, birth_month = map(int, args[0].split('.'))
+        sender_id = (await event.get_sender()).id
+
+        if not is_date_correct(birth_day, birth_month):
+            await event.reply('К сожалению, введённая дата некорректна 😔')
+            return
+
+        db_worker.update_birth_date(sender_id, birth_day, birth_month)
+        await event.reply(f'Отлично!\nДата Вашего'
+                          f' рождения успешно установлена на {birth_day} {month_properties[birth_month][1]} 🎉')
+    except ValueError:
+        await event.reply('Это не похоже на дату рождения 🤨')
 
 
 @bot.on(events.NewMessage(pattern='^/notify_at(|@chatBirthday_bot)'))
@@ -263,8 +285,8 @@ async def update_interactive_message(event):
                 keyboard.append(keyboard_row)
             keyboard.append([Button.inline('Отмена ❌', data=f"{user_id} birthdate set_day cancel -")])
             await bot.edit_message(peer, message_id,
-                f'<b>Установка (изменение) даты рождения</b>\nВы выбрали месяц {month_properties[int(pick)].name}, '
-                f'теперь выберите день Вашего рождения.', buttons=keyboard)
+                                   f'<b>Установка (изменение) даты рождения</b>\nВы выбрали месяц {month_properties[int(pick)].name}, '
+                                   f'теперь выберите день Вашего рождения.', buttons=keyboard)
         elif stage == 'set_day':
             birth_month = int(previous_pick)
             birth_day = int(pick)
