@@ -262,8 +262,8 @@ async def update_interactive_message(event):
                     keyboard_row.append(Button.inline(f'{col}', data=f'{user_id} birthdate set_day {col} {pick}'))
                 keyboard.append(keyboard_row)
             keyboard.append([Button.inline('Отмена ❌', data=f"{user_id} birthdate set_day cancel -")])
-            await bot.edit_message(
-                f'<b>Установка (изменение) даты рождения</b>\nВы выбрали месяц {month_properties[int(pick)].name},'
+            await bot.edit_message(peer, message_id,
+                f'<b>Установка (изменение) даты рождения</b>\nВы выбрали месяц {month_properties[int(pick)].name}, '
                 f'теперь выберите день Вашего рождения.', buttons=keyboard)
         elif stage == 'set_day':
             birth_month = int(previous_pick)
