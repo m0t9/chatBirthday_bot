@@ -60,7 +60,7 @@ def create_list(calendar):
 
     for date, users in days_info:
         day_message = [
-            f'<b>{date[1]} {utils.month_properties[date[0]].genitive} {utils.get_zodiac(date[1], date[2])}</b>',
+            f'<b>{date[1]} {utils.month_properties[date[0]].genitive} {utils.get_zodiac(date[1], date[0])}</b>',
             ', '.join(users)]
         message_blocks.append('\n'.join(day_message))
 
