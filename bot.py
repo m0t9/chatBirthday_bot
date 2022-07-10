@@ -1,5 +1,5 @@
 from telethon.sync import TelegramClient, events
-from telethon import functions
+from telethon import functions, errors
 from telethon.tl.types import ChannelParticipantsSearch
 from telethon.tl.custom import Button
 import datetime
@@ -216,18 +216,25 @@ async def send_notification():
     users_to_notify = db_worker.get_users_to_notify(day, month)
 
     for chat_id in chats_to_notify:
-        chat_members = await bot(functions.channels.GetParticipantsRequest(
-            chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
-            hash=0
-        ))
+        try:
+            chat_members = await bot(functions.channels.GetParticipantsRequest(
+                chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
+                hash=0
+            ))
 
-        users_to_notify_in_chat = list()
+            users_to_notify_in_chat = list()
 
-        for member in chat_members.users:
-            if member.id in users_to_notify:
-                users_to_notify_in_chat.append(await create_mention(member.id))
+            for member in chat_members.users:
+                if member.id in users_to_notify:
+                    users_to_notify_in_chat.append(await create_mention(member.id))
 
-        await congratulation(users_to_notify_in_chat, day, month, chat_id)
+            await congratulation(users_to_notify_in_chat, day, month, chat_id)
+        except errors.rpcerrorlist.ChannelPrivateError:
+            db_worker.disable_notification(chat_id)
+        except ValueError:
+            await bot.send_message(chat_id,
+                                   'Не получилось поздравить с Днем рождения 😔 '
+                                   'Возможно, этот чат не является супергруппой.')
 
 
 # callback actions
