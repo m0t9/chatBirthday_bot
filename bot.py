@@ -194,13 +194,13 @@ async def disable_notifications(event):
 
 @bot.on(events.NewMessage(pattern='^/(bd_list|list_bd)(|@chatBirthday_bot)$'))
 async def show_all_birthdays_in_chat(event):
-    chat_id = event.chat.id
-    sender_id = (await event.get_sender()).id
-
-    if not (await is_user_admin(sender_id, chat_id)):
-        return
-
     try:
+        chat_id = event.chat.id
+        sender_id = (await event.get_sender()).id
+
+        if not (await is_user_admin(sender_id, chat_id)):
+            return
+
         chat_members = await bot(functions.channels.GetParticipantsRequest(
             chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
             hash=0
