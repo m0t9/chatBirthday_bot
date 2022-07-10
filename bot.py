@@ -230,7 +230,9 @@ async def send_notification():
 
             await congratulation(users_to_notify_in_chat, day, month, chat_id)
         except errors.rpcerrorlist.ChannelPrivateError:
-            db_worker.disable_notification(chat_id)
+            pass
+        except errors.rpcerrorlist.ChatWriteForbiddenError:
+            pass
         except ValueError:
             await bot.send_message(chat_id,
                                    'Не получилось поздравить с Днем рождения 😔 '
