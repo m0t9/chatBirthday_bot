@@ -1,3 +1,5 @@
+import struct
+
 from telethon.sync import TelegramClient, events
 from telethon import functions, errors
 from telethon.tl.types import ChannelParticipantsSearch
@@ -87,10 +89,15 @@ async def greeting(event):
 
 @bot.on(events.NewMessage(pattern='^/remove_bd(|@chatBirthday_bot)$'))
 async def remove_birth_date(event):
-    user_id = (await event.get_sender()).id
-    if db_worker.birth_date_exists(user_id):
-        db_worker.remove_birth_date(user_id)
-        await event.reply('Дата Вашего рождения успешно удалена ❌')
+    try:
+        user_id = (await event.get_sender()).id
+        if db_worker.birth_date_exists(user_id):
+            db_worker.remove_birth_date(user_id)
+            await event.reply('Дата Вашего рождения успешно удалена ❌')
+    except ValueError:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
+    except struct.error:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
 
 
 @bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot)'))
@@ -133,45 +140,56 @@ async def edit_birth_date(event):
 
 @bot.on(events.NewMessage(pattern='^/notify_at(|@chatBirthday_bot)'))
 async def update_notification_time(event):
-    sender_id = (await event.get_sender()).id
-    chat_id = event.chat.id
-    if not (await is_user_admin(sender_id, chat_id)):
-        return
-
-    args = utils.get_args(event.text)
-    if len(args) == 0:
-        await event.reply(
-            'Для выполнения этой команды необходимо задать время в формате \'hh:mm\' без кавычек.')
-        return
-    elif len(args) > 1:
-        await event.reply(
-            'Для выполнения этой команды нужен единственный параметр — время в формате \'hh:mm\' без кавычек.')
-        return
     try:
-        hours, minutes = map(int, args[0].split(':'))
-
-        if not utils.is_time_correct(hours, minutes):
-            await event.reply('К сожалению, введённое время суток некорректно 😔')
+        sender_id = (await event.get_sender()).id
+        chat_id = event.chat.id
+        if not (await is_user_admin(sender_id, chat_id)):
             return
 
-        db_worker.update_notification_time(chat_id, hours, minutes)
-        await event.reply(
-            f'Отлично!\nВремя уведомления о наступивших Днях рождения в этом чате'
-            f' установлено на {("0" + str(hours))[-2:]}:{("0" + str(minutes))[-2:]} UTC+3 ⏰')
+        args = utils.get_args(event.text)
+
+        if len(args) == 0:
+            await event.reply(
+                'Для выполнения этой команды необходимо задать время в формате \'hh:mm\' без кавычек.')
+            return
+        elif len(args) > 1:
+            await event.reply(
+                'Для выполнения этой команды нужен единственный параметр — время в формате \'hh:mm\' без кавычек.')
+            return
+        try:
+            hours, minutes = map(int, args[0].split(':'))
+
+            if not utils.is_time_correct(hours, minutes):
+                await event.reply('К сожалению, введённое время суток некорректно 😔')
+                return
+
+            db_worker.update_notification_time(chat_id, hours, minutes)
+            await event.reply(
+                f'Отлично!\nВремя уведомления о наступивших Днях рождения в этом чате'
+                f' установлено на {("0" + str(hours))[-2:]}:{("0" + str(minutes))[-2:]} UTC+3 ⏰')
+        except ValueError:
+            await event.reply('Интересный формат времени 🧐 Жаль, что я его не понимаю 😔')
     except ValueError:
-        await event.reply('Интересный формат времени 🧐 Жаль, что я его не понимаю 😔')
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
+    except struct.error:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
 
 
 @bot.on(events.NewMessage(pattern='^/dont_notify(|@chatBirthday_bot)$'))
 async def disable_notifications(event):
-    sender_id = (await event.get_sender()).id
-    chat_id = event.chat.id
+    try:
+        sender_id = (await event.get_sender()).id
+        chat_id = event.chat.id
 
-    if not (await is_user_admin(sender_id, chat_id)):
-        return
+        if not (await is_user_admin(sender_id, chat_id)):
+            return
 
-    db_worker.disable_notification(chat_id)
-    await event.reply(f'Уведомления о наступивших Днях рождения в этом чате отключены ❌')
+        db_worker.disable_notification(chat_id)
+        await event.reply(f'Уведомления о наступивших Днях рождения в этом чате отключены ❌')
+    except ValueError:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
+    except struct.error:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
 
 
 @bot.on(events.NewMessage(pattern='^/(bd_list|list_bd)(|@chatBirthday_bot)$'))
@@ -202,6 +220,8 @@ async def show_all_birthdays_in_chat(event):
         message = await event.reply('.')
         await bot.edit_message(chat_id, message, create_list(calendar))
     except ValueError:
+        await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
+    except struct.error:
         await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
 
 
@@ -234,6 +254,10 @@ async def send_notification():
         except errors.rpcerrorlist.ChatWriteForbiddenError:
             pass
         except ValueError:
+            await bot.send_message(chat_id,
+                                   'Не получилось поздравить с Днем рождения 😔 '
+                                   'Возможно, этот чат не является супергруппой.')
+        except struct.error:
             await bot.send_message(chat_id,
                                    'Не получилось поздравить с Днем рождения 😔 '
                                    'Возможно, этот чат не является супергруппой.')
