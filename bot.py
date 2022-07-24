@@ -12,7 +12,6 @@ import db_funcs
 import utils
 
 # settings and constants
-
 db_worker = db_funcs.DatabaseWorker(config.DATABASE)
 bot = TelegramClient('bot', config.API_ID, config.API_HASH).start(bot_token=config.TOKEN)
 bot.parse_mode = 'html'
@@ -78,6 +77,8 @@ async def is_user_admin(user_id, chat_id):
     try:
         user = (await bot.get_permissions(chat_id, user_id))
         return user.is_admin or user.is_creator
+    except ValueError:
+        return False
     except Exception as exception:
         print('is_user_admin', exception.__class__.__name__)  # debugging
 
@@ -135,8 +136,10 @@ async def edit_birth_date(event):
         elif len(args) > 1:
             try:
                 await event.reply(
-                    'Для выполнения этой команды нужен единственный параметр — дата рождения в формате \'dd.mm\' без кавычек. '
-                    'Также доступно интерактивное изменение даты рождения, для этого не нужно вводить дополнительные параметры.')
+                    'Для выполнения этой команды нужен единственный параметр — '
+                    'дата рождения в формате \'dd.mm\' без кавычек. '
+                    'Также доступно интерактивное изменение даты рождения, '
+                    'для этого не нужно вводить дополнительные параметры.')
                 return
             except Exception as exception:
                 pass
@@ -266,6 +269,8 @@ async def show_all_birthdays_in_chat(event):
             await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
         except Exception as exception:
             pass
+    except errors.ChatForbiddenError:
+        pass
     except Exception as exception:
         print('show_all_birthdays', exception.__class__.__name__)  # debugging
 

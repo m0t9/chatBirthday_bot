@@ -13,24 +13,6 @@ class DatabaseWorker:
     def __init__(self, database_name):
         self.database = psycopg2.connect(database_name, sslmode='require')
         self.cursor = self.database.cursor()
-        initial_commands = [
-            '''CREATE TABLE IF NOT EXISTS users (
-                id BIGINT PRIMARY KEY,
-                b_day INTEGER NOT NULL,
-                b_month INTEGER NOT NULL
-            )''',
-            '''CREATE TABLE IF NOT EXISTS chats (
-                id BIGINT PRIMARY KEY,
-                notification_hour INTEGER NOT NULL,
-                notification_minute INTEGER NOT NULL
-            )
-            '''
-        ]
-
-        for command in initial_commands:
-            self.cursor.execute(command)
-
-        self.database.commit()
 
     # user methods
     def birth_date_exists(self, user_id):
@@ -71,10 +53,8 @@ class DatabaseWorker:
     def get_users_to_notify(self, day, month):
         self.cursor.execute('SELECT id FROM users WHERE (b_day = %s AND b_month = %s)',
                             (day, month,))
-        respond = self.cursor.fetchall()
-        users_to_notify = set()
-        for pair in respond:
-            users_to_notify.add(pair[0])
+        users_to_notify = self.cursor.fetchall()
+        users_to_notify = set(map(lambda user: user[0], users_to_notify))
         return users_to_notify
 
     # chat methods
@@ -107,9 +87,7 @@ class DatabaseWorker:
         self.cursor.execute(
             'SELECT id FROM chats WHERE (notification_hour = %s AND notification_minute = %s)',
             (notification_hour, notification_minute,))
-        respond = self.cursor.fetchall()
-        chats_to_notify = list()
-        for pair in respond:
-            chats_to_notify.append(pair[0])
+        chats_to_notify = self.cursor.fetchall()
+        chats_to_notify = list(map(lambda chat: chat[0], chats_to_notify))
 
         return chats_to_notify
