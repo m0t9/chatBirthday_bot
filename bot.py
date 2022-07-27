@@ -332,6 +332,8 @@ async def send_notification():
             try:
                 if pin:
                     await bot.pin_message(chat_id, message)
+            except errors.ChatAdminRequiredError:
+                pass
             except Exception as exception:
                 print('send_notification', exception.__class__.__name__)  # debugging
 
