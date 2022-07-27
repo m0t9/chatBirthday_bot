@@ -241,18 +241,18 @@ async def handle_notification_pinning(event):
         if 'unpin' in event.text:
             db_worker.update_pin_type(chat_id, False)
             try:
-                event.reply('Закрепление уведомлений в этом чате успешно <b>выключено</b> 🎉')
+                await event.reply('Закрепление уведомлений в этом чате успешно <b>выключено</b> 🎉')
             except Exception as exception:
                 print('handle_notification_pinning', exception.__class__.__name__)
         else:
             db_worker.update_pin_type(chat_id, True)
             try:
-                event.reply('Закрепление уведомлений в этом чате успешно <b>включено</b> 🎉')
+                await event.reply('Закрепление уведомлений в этом чате успешно <b>включено</b> 🎉')
             except Exception as exception:
                 print('handle_notification_pinning', exception.__class__.__name__)
     except db_funcs.ChatNotificationsDisabled:
         try:
-            event.reply('В данном чате отключены уведомления о Днях рождения 😔')
+            await event.reply('В данном чате отключены уведомления о Днях рождения 😔')
         except Exception as exception:
             print('handle_notification_pinning', exception.__class__.__name__)
     except Exception as exception:
