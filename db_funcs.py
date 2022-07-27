@@ -9,6 +9,10 @@ class BirthDateNotExists(DatabaseWorkerError):
     pass
 
 
+class ChatNotificationsDisabled(DatabaseWorkerError):
+    pass
+
+
 class DatabaseWorker:
     def __init__(self, database_name):
         self.database = psycopg2.connect(database_name, sslmode='require')
@@ -58,7 +62,7 @@ class DatabaseWorker:
         return users_to_notify
 
     # chat methods
-    def notification_time_exists(self, chat_id):
+    def does_chat_exist(self, chat_id):
         self.cursor.execute('SELECT notification_hour FROM chats WHERE id = %s', (chat_id,))
         hour = self.cursor.fetchone()
         if hour is None:
@@ -71,7 +75,7 @@ class DatabaseWorker:
         self.database.commit()
 
     def update_notification_time(self, chat_id, notification_hour, notification_minute):
-        if not self.notification_time_exists(chat_id):
+        if not self.does_chat_exist(chat_id):
             self.set_notification_time(chat_id, notification_hour, notification_minute)
         else:
             self.cursor.execute('UPDATE chats SET notification_hour = %s, notification_minute = %s WHERE id = %s',
@@ -79,7 +83,7 @@ class DatabaseWorker:
             self.database.commit()
 
     def disable_notification(self, chat_id):
-        if self.notification_time_exists(chat_id):
+        if self.does_chat_exist(chat_id):
             self.cursor.execute('DELETE FROM chats WHERE id = %s', (chat_id,))
             self.database.commit()
 
@@ -91,3 +95,16 @@ class DatabaseWorker:
         chats_to_notify = list(map(lambda chat: chat[0], chats_to_notify))
 
         return chats_to_notify
+
+    def update_pin_type(self, chat_id, pin_type):
+        if not self.does_chat_exist(chat_id):
+            raise ChatNotificationsDisabled
+        self.cursor.execute('UPDATE chats SET pin = %s WHERE id = %s', (pin_type, chat_id,))
+        self.database.commit()
+
+    def get_pin_type(self, chat_id):
+        if not self.does_chat_exist(chat_id):
+            raise ChatNotificationsDisabled
+        self.cursor.execute('SELECT pin FROM chats WHERE id = %s', (chat_id,))
+        pin_type = self.cursor.fetchone()
+        return pin_type[0]

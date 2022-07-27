@@ -32,19 +32,16 @@ async def create_mention(user_id):
         print('create_mention', exception.__class__.__name__)  # debugging
 
 
-async def congratulation(mentions, day, month, chat_id):
-    word_forms = ['празднуют пользователи', 'их']
+def congratulation(mentions, day, month):
+    word_form = 'празднуют пользователи'
     if len(mentions) == 0:
         return
     elif len(mentions) == 1:
-        word_forms = ['празднует пользователь', 'его']
+        word_form = 'празднует пользователь'
 
     text = f'В этот замечательный день — {day} {utils.month_properties[month].genitive} ' \
-           f'свой День рождения {word_forms[0]} {", ".join(mentions)}!\n\nДавайте вместе {word_forms[1]} поздравим 🎉🎉🎉'
-    try:
-        await bot.send_message(chat_id, text)
-    except Exception as exception:
-        print('congratulation', exception.__class__.__name__)  # debugging
+           f'свой День рождения {word_form} {", ".join(mentions)}!\n\nДавайте вместе поздравим 🎉🎉🎉'
+    return text
 
 
 def create_list(calendar):
@@ -232,6 +229,36 @@ async def disable_notifications(event):
         print('disable_notifications', exception.__class__.__name__)  # debugging
 
 
+@bot.on(events.NewMessage(pattern='^/(pin|unpin)(|@chatBirthday_bot)$'))
+async def handle_notification_pinning(event):
+    try:
+        sender_id = (await event.get_sender()).id
+        chat_id = event.chat.id
+
+        if not (await is_user_admin(sender_id, chat_id)):
+            return
+
+        if 'unpin' in event.text:
+            db_worker.update_pin_type(chat_id, False)
+            try:
+                event.reply('Закрепление уведомлений в этом чате успешно <b>выключено</b> 🎉')
+            except Exception as exception:
+                print('handle_notification_pinning', exception.__class__.__name__)
+        else:
+            db_worker.update_pin_type(chat_id, True)
+            try:
+                event.reply('Закрепление уведомлений в этом чате успешно <b>включено</b> 🎉')
+            except Exception as exception:
+                print('handle_notification_pinning', exception.__class__.__name__)
+    except db_funcs.ChatNotificationsDisabled:
+        try:
+            event.reply('В данном чате отключены уведомления о Днях рождения 😔')
+        except Exception as exception:
+            print('handle_notification_pinning', exception.__class__.__name__)
+    except Exception as exception:
+        print('handle_notification_pinning', exception.__class__.__name__)
+
+
 @bot.on(events.NewMessage(pattern='^/(bd_list|list_bd)(|@chatBirthday_bot)$'))
 async def show_all_birthdays_in_chat(event):
     try:
@@ -298,7 +325,16 @@ async def send_notification():
                 if member.id in users_to_notify:
                     users_to_notify_in_chat.append(await create_mention(member.id))
 
-            await congratulation(users_to_notify_in_chat, day, month, chat_id)
+            notification_text = congratulation(users_to_notify_in_chat, day, month)
+            pin = db_worker.get_pin_type(chat_id)
+
+            message = await bot.send_message(chat_id, notification_text)
+            try:
+                if pin:
+                    await bot.pin_message(chat_id, message)
+            except Exception as exception:
+                print('send_notification', exception.__class__.__name__)  # debugging
+
         except errors.rpcerrorlist.ChannelPrivateError:
             db_worker.disable_notification(chat_id)
         except errors.rpcerrorlist.ChatWriteForbiddenError:
