@@ -63,9 +63,9 @@ class DatabaseWorker:
 
     # chat methods
     def does_chat_exist(self, chat_id):
-        self.cursor.execute('SELECT notification_hour FROM chats WHERE id = %s', (chat_id,))
-        hour = self.cursor.fetchone()
-        if hour is None:
+        self.cursor.execute('SELECT * FROM chats WHERE id = %s', (chat_id,))
+        chat_data = self.cursor.fetchone()
+        if chat_data is None:
             return False
         return True
 

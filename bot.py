@@ -237,19 +237,15 @@ async def handle_notification_pinning(event):
 
         if not (await is_user_admin(sender_id, chat_id)):
             return
-
-        if 'unpin' in event.text:
-            db_worker.update_pin_type(chat_id, False)
-            try:
+        try:
+            if 'unpin' in event.text:
+                db_worker.update_pin_type(chat_id, False)
                 await event.reply('Закрепление уведомлений в этом чате успешно <b>выключено</b> 🎉')
-            except Exception as exception:
-                print('handle_notification_pinning', exception.__class__.__name__)
-        else:
-            db_worker.update_pin_type(chat_id, True)
-            try:
+            else:
+                db_worker.update_pin_type(chat_id, True)
                 await event.reply('Закрепление уведомлений в этом чате успешно <b>включено</b> 🎉')
-            except Exception as exception:
-                print('handle_notification_pinning', exception.__class__.__name__)
+        except Exception as exception:
+            print('handle_notification_pinning', exception.__class__.__name__)
     except db_funcs.ChatNotificationsDisabled:
         try:
             await event.reply('В данном чате отключены уведомления о Днях рождения 😔')
@@ -325,6 +321,9 @@ async def send_notification():
                 if member.id in users_to_notify:
                     users_to_notify_in_chat.append(await create_mention(member.id))
 
+            if len(users_to_notify_in_chat) == 0:
+                continue
+
             notification_text = congratulation(users_to_notify_in_chat, day, month)
             pin = db_worker.get_pin_type(chat_id)
 
@@ -342,19 +341,9 @@ async def send_notification():
         except errors.rpcerrorlist.ChatWriteForbiddenError:
             pass
         except ValueError:
-            try:
-                await bot.send_message(chat_id,
-                                       'Не получилось поздравить с Днем рождения 😔 '
-                                       'Возможно, этот чат не является супергруппой.')
-            except Exception:
-                pass
+            pass
         except struct.error:
-            try:
-                await bot.send_message(chat_id,
-                                       'Не получилось поздравить с Днем рождения 😔 '
-                                       'Возможно, этот чат не является супергруппой.')
-            except Exception:
-                pass
+            pass
         except Exception as exception:
             print('send_notification', exception.__class__.__name__)  # debugging
 
