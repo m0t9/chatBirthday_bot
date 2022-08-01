@@ -19,7 +19,7 @@ bot.parse_mode = 'html'
 moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
 
 
-# useful utils
+# USEFUL UTILS
 # text
 async def create_mention(user_id):
     try:
@@ -33,11 +33,11 @@ async def create_mention(user_id):
 
 
 def congratulation(mentions, day, month):
-    word_form = 'празднуют пользователи'
+    word_form = 'празднуют'
     if len(mentions) == 0:
         return
     elif len(mentions) == 1:
-        word_form = 'празднует пользователь'
+        word_form = 'празднует'
 
     text = f'В этот замечательный день — {day} {utils.month_properties[month].genitive} ' \
            f'свой День рождения {word_form} {", ".join(mentions)}!\n\nДавайте вместе поздравим 🎉🎉🎉'
@@ -69,7 +69,7 @@ def create_list(calendar):
     return '\n\n'.join(message_blocks)
 
 
-# recognize
+# recognition
 async def is_user_admin(user_id, chat_id):
     try:
         user = (await bot.get_permissions(chat_id, user_id))
@@ -80,7 +80,19 @@ async def is_user_admin(user_id, chat_id):
         print('is_user_admin', exception.__class__.__name__)  # debugging
 
 
-# bot event behavior
+async def activity_alert(event, expected, involved):
+    try:
+        if expected != involved:
+            await event.answer('Взаимодействовать с данным сообщением может только пользователь, вызвавший его ⛔',
+                               alert=True)
+            return True
+        return False
+    except Exception as exception:
+        print('activity_alert', exception.__class__.__name__)  # debugging
+        return True
+
+
+# BOT EVENT BEHAVIOR
 @bot.on(events.NewMessage(pattern='^(/start|/help)(|@chatBirthday_bot)$'))
 async def greeting(event):
     try:
@@ -123,9 +135,9 @@ async def edit_birth_date(event):
                 keyboard_row = list()
                 for col in range(row_ind, row_ind + 4):
                     keyboard_row.append(Button.inline(utils.month_properties[col + 1].name.capitalize(),
-                                                      data=f"{sender_id} birthdate set_month {col + 1} -"))
+                                                      data=f'birthdate {sender_id} set_month {col + 1} -'))
                 keyboard.append(keyboard_row)
-            keyboard.append([Button.inline('Отмена ❌', data=f"{sender_id} birthdate set_month cancel -")])
+            keyboard.append([Button.inline('Отмена ❌', data=f'birthdate {sender_id} set_month cancel -')])
 
             await event.reply('<b>Установка (изменение) даты рождения</b>\nВыберите месяц, в который Вы родились',
                               buttons=keyboard)
@@ -157,6 +169,44 @@ async def edit_birth_date(event):
             pass
     except Exception as exception:
         print('edit_birth_date', exception.__class__.__name__)  # debugging
+
+
+@bot.on(events.CallbackQuery(pattern='^birthdate'))
+async def birthdate_setting(event):
+    user_id, message_id, peer = event.original_update.user_id, event.original_update.msg_id, event.original_update.peer
+    caller, stage, pick, previous_pick = (event.original_update.data.decode('utf-8').split())[1:]
+    try:
+        if activity_alert(event, int(caller), user_id):
+            return
+
+        if pick == 'cancel':
+            await bot.edit_message(peer, message_id, 'Изменение даты рождения прервано ❌')
+            return
+
+        if stage == 'set_month':
+            keyboard = list()
+            days = utils.month_properties[int(pick)].day_count
+            for row_ind in range(1, days + 1, 5):
+                keyboard_row = list()
+                for col in range(row_ind, min(row_ind + 5, days + 1)):
+                    keyboard_row.append(Button.inline(f'{col}', data=f'birthdate {user_id} set_day {col} {pick}'))
+                keyboard.append(keyboard_row)
+            keyboard.append([Button.inline('Отмена ❌', data=f'birthdate {user_id} set_day cancel -')])
+            await bot.edit_message(peer, message_id,
+                                   f'<b>Установка (изменение) даты рождения</b>\n'
+                                   f'Вы выбрали месяц {utils.month_properties[int(pick)].name}, '
+                                   f'теперь выберите день Вашего рождения.', buttons=keyboard)
+        elif stage == 'set_day':
+            birth_month = int(previous_pick)
+            birth_day = int(pick)
+
+            db_worker.update_birth_date(user_id, birth_day, birth_month)
+
+            await bot.edit_message(peer, message_id,
+                                   f'Отлично!\nДата Вашего рождения успешно '
+                                   f'установлена на {birth_day} {utils.month_properties[birth_month].genitive} 🎉')
+    except Exception as exception:
+        print('birthdate_setting', exception.__class__.__name__)  # debugging
 
 
 @bot.on(events.NewMessage(pattern='^/notify_at(|@chatBirthday_bot)'))
@@ -229,6 +279,55 @@ async def disable_notifications(event):
         print('disable_notifications', exception.__class__.__name__)  # debugging
 
 
+async def send_notification():
+    hour, minute = int(datetime.datetime.now(tz=moscow_timezone).hour), int(
+        datetime.datetime.now(tz=moscow_timezone).minute)
+    day, month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
+        datetime.datetime.now(tz=moscow_timezone).month)
+
+    chats_to_notify = db_worker.get_chats_to_notify(hour, minute)
+    users_to_notify = db_worker.get_users_to_notify(day, month)
+
+    for chat_id in chats_to_notify:
+        try:
+            chat_members = await bot(functions.channels.GetParticipantsRequest(
+                chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
+                hash=0
+            ))
+
+            users_to_notify_in_chat = list()
+
+            for member in chat_members.users:
+                if member.id in users_to_notify:
+                    users_to_notify_in_chat.append(await create_mention(member.id))
+
+            if len(users_to_notify_in_chat) == 0:
+                continue
+
+            notification_text = congratulation(users_to_notify_in_chat, day, month)
+            pin = db_worker.get_pin_type(chat_id)
+
+            message = await bot.send_message(chat_id, notification_text)
+            try:
+                if pin:
+                    await bot.pin_message(chat_id, message)
+            except errors.ChatAdminRequiredError:
+                pass
+            except Exception as exception:
+                print('send_notification', exception.__class__.__name__)  # debugging
+
+        except errors.rpcerrorlist.ChannelPrivateError:
+            db_worker.disable_notification(chat_id)
+        except errors.rpcerrorlist.ChatWriteForbiddenError:
+            pass
+        except ValueError:
+            pass
+        except struct.error:
+            pass
+        except Exception as exception:
+            print('send_notification', exception.__class__.__name__)  # debugging
+
+
 @bot.on(events.NewMessage(pattern='^/(pin|unpin)(|@chatBirthday_bot)$'))
 async def handle_notification_pinning(event):
     try:
@@ -298,102 +397,8 @@ async def show_all_birthdays_in_chat(event):
         print('show_all_birthdays', exception.__class__.__name__)  # debugging
 
 
-# bot notification sending
-async def send_notification():
-    hour, minute = int(datetime.datetime.now(tz=moscow_timezone).hour), int(
-        datetime.datetime.now(tz=moscow_timezone).minute)
-    day, month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
-        datetime.datetime.now(tz=moscow_timezone).month)
-
-    chats_to_notify = db_worker.get_chats_to_notify(hour, minute)
-    users_to_notify = db_worker.get_users_to_notify(day, month)
-
-    for chat_id in chats_to_notify:
-        try:
-            chat_members = await bot(functions.channels.GetParticipantsRequest(
-                chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
-                hash=0
-            ))
-
-            users_to_notify_in_chat = list()
-
-            for member in chat_members.users:
-                if member.id in users_to_notify:
-                    users_to_notify_in_chat.append(await create_mention(member.id))
-
-            if len(users_to_notify_in_chat) == 0:
-                continue
-
-            notification_text = congratulation(users_to_notify_in_chat, day, month)
-            pin = db_worker.get_pin_type(chat_id)
-
-            message = await bot.send_message(chat_id, notification_text)
-            try:
-                if pin:
-                    await bot.pin_message(chat_id, message)
-            except errors.ChatAdminRequiredError:
-                pass
-            except Exception as exception:
-                print('send_notification', exception.__class__.__name__)  # debugging
-
-        except errors.rpcerrorlist.ChannelPrivateError:
-            db_worker.disable_notification(chat_id)
-        except errors.rpcerrorlist.ChatWriteForbiddenError:
-            pass
-        except ValueError:
-            pass
-        except struct.error:
-            pass
-        except Exception as exception:
-            print('send_notification', exception.__class__.__name__)  # debugging
-
-
-# callback actions
-@bot.on(events.CallbackQuery())
-async def update_interactive_message(event):
-    try:
-        user_id = event.original_update.user_id
-        message_id = event.original_update.msg_id
-        peer = event.original_update.peer
-        caller, request_type, stage, pick, previous_pick = event.original_update.data.decode('utf-8').split()
-
-        if int(caller) != user_id:
-            await event.answer('Взаимодействовать с данным сообщением может только пользователь, вызвавший его ⛔',
-                               alert=True)
-            return
-
-        if request_type == 'birthdate':
-            if pick == 'cancel':
-                await bot.edit_message(peer, message_id, 'Изменение даты рождения прервано ❌')
-                return
-            if stage == 'set_month':
-                keyboard = list()
-                days = utils.month_properties[int(pick)].day_count
-                for row_ind in range(1, days + 1, 5):
-                    keyboard_row = list()
-                    for col in range(row_ind, min(row_ind + 5, days + 1)):
-                        keyboard_row.append(Button.inline(f'{col}', data=f'{user_id} birthdate set_day {col} {pick}'))
-                    keyboard.append(keyboard_row)
-                keyboard.append([Button.inline('Отмена ❌', data=f"{user_id} birthdate set_day cancel -")])
-                await bot.edit_message(peer, message_id,
-                                       f'<b>Установка (изменение) даты рождения</b>\n'
-                                       f'Вы выбрали месяц {utils.month_properties[int(pick)].name}, '
-                                       f'теперь выберите день Вашего рождения.', buttons=keyboard)
-            elif stage == 'set_day':
-                birth_month = int(previous_pick)
-                birth_day = int(pick)
-
-                db_worker.update_birth_date(user_id, birth_day, birth_month)
-
-                await bot.edit_message(peer, message_id,
-                                       f'Отлично!\nДата Вашего рождения успешно '
-                                       f'установлена на {birth_day} {utils.month_properties[birth_month].genitive} 🎉')
-    except Exception as exception:
-        print('update_interactive_message', exception.__class__.__name__)  # debugging
-
-
 # start bot
-if __name__ == "__main__":
+if __name__ == '__main__':
     scheduler = AsyncIOScheduler()
     scheduler.add_job(send_notification, 'interval', minutes=1)
     scheduler.start()
