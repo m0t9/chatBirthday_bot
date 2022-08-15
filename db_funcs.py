@@ -31,10 +31,10 @@ class DatabaseWorker:
             raise BirthDateNotExists
 
         self.cursor.execute('SELECT b_day FROM users WHERE id = %s', (user_id,))
-        day = self.cursor.fetchone()
+        day = (self.cursor.fetchone())[0]
         self.cursor.execute('SELECT b_month FROM users WHERE id = %s', (user_id,))
-        month = self.cursor.fetchone()
-        return day[0], month[0]
+        month = (self.cursor.fetchone())[0]
+        return day, month
 
     def set_birth_date(self, user_id, birth_day, birth_month):
         self.cursor.execute('INSERT INTO users (id, b_day, b_month) VALUES(%s, %s, %s)',
@@ -106,5 +106,5 @@ class DatabaseWorker:
         if not self.does_chat_exist(chat_id):
             raise ChatNotificationsDisabled
         self.cursor.execute('SELECT pin FROM chats WHERE id = %s', (chat_id,))
-        pin_type = self.cursor.fetchone()
-        return pin_type[0]
+        pin_type = (self.cursor.fetchone())[0]
+        return pin_type

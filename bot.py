@@ -174,7 +174,7 @@ async def edit_birth_date(event):
 @bot.on(events.CallbackQuery(pattern='^birthdate'))
 async def birthdate_setting(event):
     user_id, message_id, peer = event.original_update.user_id, event.original_update.msg_id, event.original_update.peer
-    caller, stage, pick, previous_pick = (event.original_update.data.decode('utf-8').split())[1:]
+    caller, stage, pick, previous_pick = utils.get_args(event.original_update.data.decode('utf-8'))
     try:
         if await activity_alert(event, int(caller), user_id):
             return
