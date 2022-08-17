@@ -8,18 +8,18 @@ import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import config
-import db_funcs
-import utils
+import utils.db_utils as db_utils
+import utils.format_utils as format_utils
 
 # settings and constants
-db_worker = db_funcs.DatabaseWorker(config.DATABASE)
+db_worker = db_utils.DatabaseWorker(config.DATABASE)
 bot = TelegramClient('bot', config.API_ID, config.API_HASH).start(bot_token=config.TOKEN)
 bot.parse_mode = 'html'
 
 moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
 
 
-# USEFUL UTILS
+# USEFUL format_utils
 # text
 async def create_mention(user_id):
     try:
@@ -39,7 +39,7 @@ def congratulation(mentions, day, month):
     elif len(mentions) == 1:
         word_form = 'празднует'
 
-    text = f'В этот замечательный день — {day} {utils.month_properties[month].genitive} ' \
+    text = f'В этот замечательный день — {day} {format_utils.month_properties[month].genitive} ' \
            f'свой День рождения {word_form} {", ".join(mentions)}!\n\nДавайте вместе поздравим 🎉🎉🎉'
     return text
 
@@ -62,7 +62,7 @@ def create_list(calendar):
 
     for date, users in days_info:
         day_message = [
-            f'<b>{date[1]} {utils.month_properties[date[0]].genitive} {utils.get_zodiac(date[1], date[0])}</b>',
+            f'<b>{date[1]} {format_utils.month_properties[date[0]].genitive} {format_utils.get_zodiac(date[1], date[0])}</b>',
             ', '.join(users)]
         message_blocks.append('\n'.join(day_message))
 
@@ -127,14 +127,14 @@ async def remove_birth_date(event):
 @bot.on(events.NewMessage(pattern='^/edit_bd(|@chatBirthday_bot)'))
 async def edit_birth_date(event):
     try:
-        args = utils.get_args(event.text)
+        args = format_utils.get_args(event.text)
         sender_id = (await event.get_sender()).id
         if len(args) == 0:
             keyboard = list()
             for row_ind in range(0, 12, 4):
                 keyboard_row = list()
                 for col in range(row_ind, row_ind + 4):
-                    keyboard_row.append(Button.inline(utils.month_properties[col + 1].name.capitalize(),
+                    keyboard_row.append(Button.inline(format_utils.month_properties[col + 1].name.capitalize(),
                                                       data=f'birthdate {sender_id} set_month {col + 1} -'))
                 keyboard.append(keyboard_row)
             keyboard.append([Button.inline('Отмена ❌', data=f'birthdate {sender_id} set_month cancel -')])
@@ -155,13 +155,13 @@ async def edit_birth_date(event):
 
         birth_day, birth_month = map(int, args[0].split('.'))
 
-        if not utils.is_date_correct(birth_day, birth_month):
+        if not format_utils.is_date_correct(birth_day, birth_month):
             await event.reply('К сожалению, введённая дата некорректна 😔')
             return
 
         db_worker.update_birth_date(sender_id, birth_day, birth_month)
         await event.reply(f'Отлично!\nДата Вашего рождения успешно '
-                          f'установлена на {birth_day} {utils.month_properties[birth_month].genitive} 🎉')
+                          f'установлена на {birth_day} {format_utils.month_properties[birth_month].genitive} 🎉')
     except ValueError:
         try:
             await event.reply('Это не похоже на дату рождения 🤨')
@@ -174,7 +174,7 @@ async def edit_birth_date(event):
 @bot.on(events.CallbackQuery(pattern='^birthdate'))
 async def birthdate_setting(event):
     user_id, message_id, peer = event.original_update.user_id, event.original_update.msg_id, event.original_update.peer
-    caller, stage, pick, previous_pick = utils.get_args(event.original_update.data.decode('utf-8'))
+    caller, stage, pick, previous_pick = format_utils.get_args(event.original_update.data.decode('utf-8'))
     try:
         if await activity_alert(event, int(caller), user_id):
             return
@@ -185,7 +185,7 @@ async def birthdate_setting(event):
 
         if stage == 'set_month':
             keyboard = list()
-            days = utils.month_properties[int(pick)].day_count
+            days = format_utils.month_properties[int(pick)].day_count
             for row_ind in range(1, days + 1, 5):
                 keyboard_row = list()
                 for col in range(row_ind, min(row_ind + 5, days + 1)):
@@ -194,7 +194,7 @@ async def birthdate_setting(event):
             keyboard.append([Button.inline('Отмена ❌', data=f'birthdate {user_id} set_day cancel -')])
             await bot.edit_message(peer, message_id,
                                    f'<b>Установка (изменение) даты рождения</b>\n'
-                                   f'Вы выбрали месяц {utils.month_properties[int(pick)].name}, '
+                                   f'Вы выбрали месяц {format_utils.month_properties[int(pick)].name}, '
                                    f'теперь выберите день Вашего рождения.', buttons=keyboard)
         elif stage == 'set_day':
             birth_month = int(previous_pick)
@@ -204,7 +204,7 @@ async def birthdate_setting(event):
 
             await bot.edit_message(peer, message_id,
                                    f'Отлично!\nДата Вашего рождения успешно '
-                                   f'установлена на {birth_day} {utils.month_properties[birth_month].genitive} 🎉')
+                                   f'установлена на {birth_day} {format_utils.month_properties[birth_month].genitive} 🎉')
     except Exception as exception:
         print('birthdate_setting', exception.__class__.__name__)  # debugging
 
@@ -217,7 +217,7 @@ async def update_notification_time(event):
         if not (await is_user_admin(sender_id, chat_id)):
             return
 
-        args = utils.get_args(event.text)
+        args = format_utils.get_args(event.text)
 
         if len(args) != 1:
             await event.reply(
@@ -227,7 +227,7 @@ async def update_notification_time(event):
         try:
             hours, minutes = map(int, args[0].split(':'))
 
-            if not utils.is_time_correct(hours, minutes):
+            if not format_utils.is_time_correct(hours, minutes):
                 await event.reply('К сожалению, введённое время суток некорректно 😔')
                 return
 
@@ -345,7 +345,7 @@ async def handle_notification_pinning(event):
                 await event.reply('Закрепление уведомлений в этом чате успешно <b>включено</b> 🎉')
         except Exception as exception:
             print('handle_notification_pinning', exception.__class__.__name__)
-    except db_funcs.ChatNotificationsDisabled:
+    except db_utils.ChatNotificationsDisabled:
         try:
             await event.reply('В данном чате отключены уведомления о Днях рождения 😔')
         except Exception as exception:
