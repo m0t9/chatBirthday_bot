@@ -417,9 +417,10 @@ async def show_next_birthdays(event):
             days_info.append(days_info[0])
             days_info.pop(0)
 
-        message_content = f'<b>Следующий праздник — {days_info[0][0][1]} ' \
-                          f'{format_utils.month_properties[days_info[0][0][0]].genitive}.</b>\n\n' \
-                          f'Будем поздравлять {", ".join(days_info[0][1])} 🎉'
+        date_and_users = days_info[0]
+        message_content = f'<b>Следующий праздник — {date_and_users[0][1]} ' \
+                          f'{format_utils.month_properties[date_and_users[0][0]].genitive}.</b>\n\n' \
+                          f'Будем поздравлять с Днем рождения {", ".join(date_and_users[1])} 🎉'
 
         message = await event.reply('.')
         await bot.edit_message(chat_id, message, message_content)
