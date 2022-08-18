@@ -23,6 +23,18 @@ month_properties = {
 }
 
 
+def create_congratulation(mentions, day, month):
+    word_form = 'празднуют'
+    if len(mentions) == 0:
+        return
+    elif len(mentions) == 1:
+        word_form = 'празднует'
+
+    text = f'В этот замечательный день — {day} {month_properties[month].genitive} ' \
+           f'свой День рождения {word_form} {", ".join(mentions)}!\n\nДавайте вместе поздравим 🎉🎉🎉'
+    return text
+
+
 def is_date_correct(day, month):
     return (month in month_properties) and (1 <= day <= month_properties[month].day_count)
 

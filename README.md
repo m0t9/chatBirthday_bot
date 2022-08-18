@@ -7,7 +7,7 @@ Its main goal — to notify Telegram-chat participants about upcoming Birthdays.
 3. Send `/help` to chat or bot\'s *Personal messages* to get all the settings and commands.
 
 # 📝 What changes are planned for the future?
-- [ ] First of all, it is necessary to add different timezones support for user convenience.
+- [ ] It is necessary to add different timezones support for user convenience.
 - [x] In large chats opportunity to auto-pin notification message may be very useful.
-- [ ] Sometimes it is interesting to get next Birthday.
+- [x] Sometimes it is interesting to get next Birthday.
 - [ ] Chat's Birthday list will be available for all chat participants in convenient page view.

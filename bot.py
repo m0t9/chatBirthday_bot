@@ -32,25 +32,21 @@ async def create_mention(user_id):
         print('create_mention', exception.__class__.__name__)  # debugging
 
 
-def congratulation(mentions, day, month):
-    word_form = 'празднуют'
-    if len(mentions) == 0:
-        return
-    elif len(mentions) == 1:
-        word_form = 'празднует'
+async def create_calendar(users):
+    calendar = dict()
+    for member in users:
+        if not db_worker.birth_date_exists(member.id):
+            continue
+        birth_day, birth_month = db_worker.get_birth_date(member.id)
+        mention = await create_mention(member.id)
+        if (birth_month, birth_day) in calendar:
+            calendar[(birth_month, birth_day)].append(mention)
+        else:
+            calendar[(birth_month, birth_day)] = [mention]
+    return calendar
 
-    text = f'В этот замечательный день — {day} {format_utils.month_properties[month].genitive} ' \
-           f'свой День рождения {word_form} {", ".join(mentions)}!\n\nДавайте вместе поздравим 🎉🎉🎉'
-    return text
 
-
-def create_list(calendar):
-    if len(calendar) == 0:
-        return 'В этом чате нет данных о Днях рождения 😔'
-
-    days_info = sorted(calendar.items())
-    message_blocks = ['<b>Данные о Днях рождения в этом чате</b>']
-
+def reorder_calendar(days_info):
     current_day, current_month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
         datetime.datetime.now(tz=moscow_timezone).month)
     for pivot in range(len(days_info)):
@@ -59,6 +55,15 @@ def create_list(calendar):
                 days_info.append(days_info[0])
                 days_info.pop(0)
             break
+    return days_info
+
+
+def create_all_birthdays_list(calendar):
+    if len(calendar) == 0:
+        return 'В этом чате нет данных о Днях рождения 😔'
+
+    days_info = reorder_calendar(sorted(calendar.items()))
+    message_blocks = ['<b>Данные о Днях рождения в этом чате</b>']
 
     for date, users in days_info:
         day_message = [
@@ -304,7 +309,7 @@ async def send_notification():
             if len(users_to_notify_in_chat) == 0:
                 continue
 
-            notification_text = congratulation(users_to_notify_in_chat, day, month)
+            notification_text = format_utils.create_congratulation(users_to_notify_in_chat, day, month)
             pin = db_worker.get_pin_type(chat_id)
 
             message = await bot.send_message(chat_id, notification_text)
@@ -368,19 +373,10 @@ async def show_all_birthdays_in_chat(event):
             hash=0
         ))
 
-        calendar = dict()
-        for member in chat_members.users:
-            if not db_worker.birth_date_exists(member.id):
-                continue
-            birth_day, birth_month = db_worker.get_birth_date(member.id)
-            mention = await create_mention(member.id)
-            if (birth_month, birth_day) in calendar:
-                calendar[(birth_month, birth_day)].append(mention)
-            else:
-                calendar[(birth_month, birth_day)] = [mention]
+        calendar = await create_calendar(chat_members.users)
 
         message = await event.reply('.')
-        await bot.edit_message(chat_id, message, create_list(calendar))
+        await bot.edit_message(chat_id, message, create_all_birthdays_list(calendar))
     except ValueError:
         try:
             await event.reply('Произошла ошибка 😔 Возможно, этот чат не является супергруппой.')
@@ -395,6 +391,45 @@ async def show_all_birthdays_in_chat(event):
         pass
     except Exception as exception:
         print('show_all_birthdays', exception.__class__.__name__)  # debugging
+
+
+@bot.on(events.NewMessage(pattern='^/next_bd(|@chatBirthday_bot)$'))
+async def show_next_birthdays(event):
+    try:
+        chat_id = event.chat.id
+
+        chat_members = await bot(functions.channels.GetParticipantsRequest(
+            chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
+            hash=0
+        ))
+
+        calendar = await create_calendar(chat_members.users)
+
+        if len(calendar) == 0:
+            await event.reply('В этом чате нет данных о Днях рождения 😔')
+            return
+
+        days_info = reorder_calendar(sorted(calendar.items()))
+
+        current_day, current_month = int(datetime.datetime.now(tz=moscow_timezone).day), int(
+            datetime.datetime.now(tz=moscow_timezone).month)
+        if days_info[0][0] == (current_month, current_day):
+            days_info.append(days_info[0])
+            days_info.pop(0)
+
+        message_content = f'<b>Следующий праздник — {days_info[0][1]} ' \
+                          f'{format_utils.month_properties[days_info[0][0]].genitive}.</b>\n\n' \
+                          f'Будем поздравлять {", ".join(days_info[0][1])} 🎉'
+
+        message = await event.reply('.')
+        await bot.edit_message(chat_id, message, message_content)
+    except TypeError:
+        try:
+            await event.reply('Здесь недоступно выполнение данного запроса 😔')
+        except Exception as exception:
+            print('show_next_birthdays', exception.__class__.__name__)  # debugging
+    except Exception as exception:
+        print('show_next_birthdays', exception.__class__.__name__)  # debugging
 
 
 # start bot
