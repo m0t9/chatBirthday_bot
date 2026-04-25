@@ -1,5 +1,9 @@
 import struct
+import asyncio
+import random
+from functools import wraps
 
+from cachetools import LRUCache
 from telethon.sync import TelegramClient, events
 from telethon import functions, errors
 from telethon.tl.types import ChannelParticipantsSearch
@@ -17,6 +21,66 @@ bot = TelegramClient('bot', config.API_ID, config.API_HASH).start(bot_token=conf
 bot.parse_mode = 'html'
 
 moscow_timezone = datetime.timezone(datetime.timedelta(hours=3))
+
+
+def async_lru_ttl_cache(maxsize=50, ttl_seconds=24 * 60 * 60, jitter_seconds=60 * 60):
+    def decorator(func):
+        cache = LRUCache(maxsize=maxsize)
+        lock = asyncio.Lock()
+
+        def freeze(value):
+            if isinstance(value, dict):
+                return tuple(sorted((freeze(k), freeze(v)) for k, v in value.items()))
+            if isinstance(value, (list, tuple)):
+                return tuple(freeze(item) for item in value)
+            if isinstance(value, set):
+                return tuple(sorted(freeze(item) for item in value))
+            return value
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            key = (freeze(args), freeze(kwargs))
+            now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+
+            async with lock:
+                cached = cache.get(key)
+                if cached is not None:
+                    value, expires_at = cached
+                    if expires_at > now:
+                        return value
+                    cache.pop(key, None)
+
+            value = await func(*args, **kwargs)
+            expires_at = now + ttl_seconds + random.randint(0, jitter_seconds)
+
+            async with lock:
+                cache[key] = (value, expires_at)
+
+            return value
+
+        return wrapper
+
+    return decorator
+
+
+@async_lru_ttl_cache(maxsize=50, ttl_seconds=24 * 60 * 60, jitter_seconds=60 * 60)
+async def get_chat_members(chat_id):
+    return await bot(functions.channels.GetParticipantsRequest(
+        chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
+        hash=0
+    ))
+
+
+async def get_users_to_notify_in_chat(chat_id, users_to_notify):
+    chat_members = await get_chat_members(chat_id)
+    users_to_notify_set = set(users_to_notify)
+
+    users_to_notify_in_chat = list()
+    for member in chat_members.users:
+        if member.id in users_to_notify_set:
+            users_to_notify_in_chat.append(await create_mention(member.id))
+
+    return users_to_notify_in_chat
 
 
 # USEFUL format_utils
@@ -295,16 +359,7 @@ async def send_notification():
 
     for chat_id in chats_to_notify:
         try:
-            chat_members = await bot(functions.channels.GetParticipantsRequest(
-                chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
-                hash=0
-            ))
-
-            users_to_notify_in_chat = list()
-
-            for member in chat_members.users:
-                if member.id in users_to_notify:
-                    users_to_notify_in_chat.append(await create_mention(member.id))
+            users_to_notify_in_chat = await get_users_to_notify_in_chat(chat_id, users_to_notify)
 
             if len(users_to_notify_in_chat) == 0:
                 continue
@@ -368,10 +423,7 @@ async def show_all_birthdays_in_chat(event):
         if not (await is_user_admin(sender_id, chat_id)):
             return
 
-        chat_members = await bot(functions.channels.GetParticipantsRequest(
-            chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
-            hash=0
-        ))
+        chat_members = await get_chat_members(chat_id)
 
         calendar = await create_calendar(chat_members.users)
 
@@ -398,10 +450,7 @@ async def show_next_birthdays(event):
     try:
         chat_id = event.chat.id
 
-        chat_members = await bot(functions.channels.GetParticipantsRequest(
-            chat_id, ChannelParticipantsSearch(''), offset=0, limit=10000,
-            hash=0
-        ))
+        chat_members = await get_chat_members(chat_id)
 
         calendar = await create_calendar(chat_members.users)
 
